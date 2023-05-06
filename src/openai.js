@@ -41,6 +41,55 @@ class OpenAI {
             console.log('openai transcription error', error.message);
         }
     }
+
+    async generateImage(prompt){
+
+        try {
+            // console.log('openai Object', openai);
+
+            const response = await this.openai.createImage({
+                prompt,
+                n: 1,
+                size: "1024x1024",
+              });
+
+            return response.data.data[0].url
+
+        } catch (error) {
+            if (error.response) {
+                console.log(error.response.status);
+                console.log(error.response.data);
+                const errorMsg = error.response.data.error.message
+                throw Error(errorMsg)
+              } else {
+                console.log('openai generation image error', error.message);
+              }
+        }
+    }
+
+    async createImageVariation(filepath){
+
+        try {
+            const response = await openai.createImageVariation(
+                fs.createReadStream(`${filepath}_variation.png`),
+                1,
+                "1024x1024"
+              );
+            
+            const image_url = response.data.data[0].url;
+
+            return respose.data.text
+
+        } catch (error) {
+            if (error.response) {
+                console.log(error.response.status);
+                console.log(error.response.data);
+              } else {
+                console.log('openai create image variation error', error.message);
+              }
+
+        }
+    }
 }
 
 export const openai = new OpenAI()

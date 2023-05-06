@@ -3,13 +3,20 @@ import { Telegraf, session } from "telegraf";
 import { message } from 'telegraf/filters'
 import { code } from 'telegraf/format'
 import { ogg } from './ogg.js'
+import { png } from './image.js'
 import { openai } from "./openai.js";
 
 console.log(c.get('TEST'));
 
-const bot = new Telegraf(c.get('TG_TOKEN'));
+const bot = new Telegraf(c.get('TG_TOKEN'), {polling: true});
+
+const mode ={
+    chat: 'chatGPT',
+    picture: 'picture'
+}
 
 const INITIAL_SESSION = { 
+    mode: mode.chat,
     messages: []
 }
 
@@ -20,10 +27,30 @@ bot.command('new', async (ctx)=> {
     await ctx.reply('Жду вашего голосового или текстового сообщения')
 })
 
+bot.hears('Вариант 1 - Чат', (ctx) => {
+    ctx.session.mode = mode.chat;
+});
+bot.hears('Вариант 2 - Картинка', (ctx) => {
+    ctx.session.mode = mode.picture;
+});
+
 bot.command('start', async (ctx)=> {
     ctx.session = INITIAL_SESSION;
     await ctx.reply('Жду вашего голосового или текстового сообщения')
+
+    await ctx.reply("Чем бы вы хотели заняться?", {
+        reply_markup: {
+          keyboard: [
+            ["Вариант 1 - Чат", "Вариант 2 - Картинка"],
+          ],
+          one_time_keyboard: true
+        }})
+
 })
+
+// bot.on('text', contains('Option 1'), (ctx) => {
+//     // Do something when a message containing 'subscribe' is received
+//   });
 
 
 bot.on(message('voice'), async (ctx)=> {
@@ -49,10 +76,43 @@ bot.on(message('voice'), async (ctx)=> {
     } catch (error) {
         console.log('Error while voice msg', error)        
     }
+})
+
+bot.on('photo', async (ctx)=> {
+    ctx.session ??= INITIAL_SESSION;
+    try {
+        await ctx.reply(code('Принимаю картинку ...'))
+
+        // const chatId = msg.chat.id;
+        // const photo = msg.photo.pop(); // Get the photo with the highest resolution
+        // bot.sendPhoto(chatId, photo.file_id);
+
+        const fileId = ctx.message.photo[ctx.message.photo.length-2].file_id
+        const link = await ctx.telegram.getFileLink(fileId)
+        const linkHref = String(link.href)
+        const userId = String(ctx.message.from.id)
+
+        const pngPath = await png.create(linkHref, userId)
+        
+        console.log('ctx', ctx.message.photo);
+        await ctx.reply(`fileId ${fileId}`)
+    } catch (error) {
+        console.log('Error while photo msg', error)        
+    }
 
 })
 
-bot.on(message('voice'), async (ctx)=> {
+// sending photo back
+// bot.on('message', (msg) => {
+//     const chatId = msg.chat.id;
+  
+//     // send an image as an attachment
+//     bot.sendPhoto(chatId, 'path_to_your_image.jpg', {
+//       caption: 'This is your image!'
+//     });
+//   });
+
+bot.on(message('text'), async (ctx)=> {
     ctx.session ??= INITIAL_SESSION;
     try {
         await ctx.reply(code('Обрабатываю запрос ...'))
@@ -65,14 +125,9 @@ bot.on(message('voice'), async (ctx)=> {
         
         await ctx.reply(response.content)
     } catch (error) {
-        console.log('Error while voice msg', error)        
+        console.log('Error while text msg', error)        
     }
 
-})
-
-
-bot.command('start', async(ctx)=>{
-    await ctx.reply(JSON.stringify(ctx.message, null, 2))
 })
 
 bot.launch()
