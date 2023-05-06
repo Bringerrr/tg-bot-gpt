@@ -28,9 +28,11 @@ bot.command('new', async (ctx)=> {
 })
 
 bot.hears('Вариант 1 - Чат', (ctx) => {
+    ctx.session = INITIAL_SESSION;
     ctx.session.mode = mode.chat;
 });
 bot.hears('Вариант 2 - Картинка', (ctx) => {
+    ctx.session = INITIAL_SESSION;
     ctx.session.mode = mode.picture;
 });
 
