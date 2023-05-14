@@ -1,30 +1,59 @@
 import { png } from '../image.js'
+import { code } from 'telegraf/format'
+import { openai } from "../openai.js";
 
-export const photoGeneration = async (ctx) => {
+import midjourney from "midjourney-client"
 
-    ctx.session.messages.push({role: openai.roles.USER, content: ctx.message.text});
-    ctx.session.mode = 'picture';
+export const imageGeneratorTypes = {
+    openai: 'DALL·E',
+    midjourney: 'Midjourney',  
+} 
+
+export const photoGeneration = async ({ctx, idea, generator = imageGeneratorTypes.openai}) => {
+    try {    
+        let imgUrl = null;
+        let midjourneyError = false
     
-    // const response = await openai.chat(ctx.session.messages)
-
-    console.log('ctx.message.text', ctx.message.text);
-    const imgUrl = await openai.generateImage(ctx.message.text)
-    const fileName = `${String(ctx.message.from.id)}_generated`
+        await ctx.reply(code(`${generator} генерирует изображение ...`))
     
-    await png.create(imgUrl, fileName)
+        if(generator === imageGeneratorTypes.midjourney){
+            try {
+                imgUrl = await midjourney(idea);
+            } catch (error) {
+                midjourneyError = true
+                console.log('generating midjourney error' , error);
+                await ctx.reply('К сожалению, Midjourney сейчас недоступен. Так что DALL·E сейчас сгенерирует изображение вместе него')
+            }
+        }
+        
+        if(midjourneyError || (generator === imageGeneratorTypes.openai)){
+            imgUrl = await openai.generateImage(idea)
+        }
+    
+        const fileName = `${String(ctx.message.from.id)}_generated`
+        const generatedPicturePath = await png.create(imgUrl, fileName)
+    
+        await ctx.replyWithPhoto({
+            source: generatedPicturePath
+        })
+        
+    } catch (error) {
+        await ctx.reply(`Не удалось сгенерировать изображение по следующей причине: ${error.message}`)
+        throw Error(error)
+    }
+
 }
 
-export const photoGeneration = async (ctx) => {
+export const justChatting = async (ctx) => {
+
+    await ctx.reply(code('Обрабатываю запрос ...'))
 
     ctx.session.messages.push({role: openai.roles.USER, content: ctx.message.text});
-    ctx.session.mode = 'picture';
 
-    // const response = await openai.chat(ctx.session.messages)
+    const response = await openai.chat(ctx.session.messages)
 
-    console.log('ctx.message.text', ctx.message.text);
-    const imgUrl = await openai.generateImage(ctx.message.text)
-    const fileName = `${String(ctx.message.from.id)}_generated`
-    
-    await png.create(imgUrl, fileName)
-    await ctx.sendPhoto(imgUrl)
+    ctx.session.messages.push({role: openai.roles.ASSISTANT, content: response.content});
+
+    await ctx.reply(response.content)
+
 }
